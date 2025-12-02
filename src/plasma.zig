@@ -23,22 +23,24 @@ pub fn main() !void {
     const image_w = 16 * 60;
     const image_h = 9 * 60;
 
-    for (0..240) |i| {
-        var file_name_buf: [64]u8 = undefined; // temp buffer for filename
+    const total_frames = 240;
 
-        const filename = try std.fmt.bufPrint(
+    for (0..total_frames) |i| {
+        var file_name_buf: [64]u8 = undefined;
+
+        const output_path = try std.fmt.bufPrint(
             &file_name_buf,
-            "output-{d:0>2}.ppm", // {d:0>2} = zero-padded width 2
+            "output-{d:0>3}.ppm",
             .{i},
         );
 
-        var file = try output_dir.createFile(filename, .{
+        var file = try output_dir.createFile(output_path, .{
             .truncate = true,
             .read = false,
         });
         defer file.close();
 
-        var buf: [4096]u8 = undefined; // or use &.{} for unbuffered
+        var buf: [4096]u8 = undefined;
         var file_writer: std.fs.File.Writer = file.writer(&buf);
         const writer: *std.Io.Writer = &file_writer.interface;
 
@@ -46,17 +48,16 @@ pub fn main() !void {
 
         const r = @Vector(2, f32){ @floatFromInt(image_w), @floatFromInt(image_h) };
 
-        const t = (@as(f32, @floatFromInt(i)) / 240.0) * 2.0 * std.math.pi;
+        const t = (@as(f32, @floatFromInt(i)) / 240.0) * 2 * std.math.pi;
 
         for (0..image_h) |y| {
             for (0..image_w) |x| {
                 const FC: @Vector(2, f32) = .{ @floatFromInt((x)), @floatFromInt((y)) };
 
                 const p = (FC * @Vector(2, f32){ 2.0, 2.0 } - r) / @Vector(2, f32){ r[1], r[1] };
-                var l = @Vector(2, f32){ 0.0, 0.0 };
-                l += @Vector(2, f32){ 4.0, 4.0 } - @Vector(2, f32){ 4.0, 4.0 } * @Vector(2, f32){ @abs(0.7 - dot(p, p)), @abs(0.7 - dot(p, p)) };
+                const l = @Vector(2, f32){ 4.0, 4.0 } - @Vector(2, f32){ 4.0, 4.0 } * @Vector(2, f32){ @abs(0.7 - dot(p, p)), @abs(0.7 - dot(p, p)) };
                 var v = p * l;
-                var loop_i = @Vector(2, f32){ @floatFromInt(i), 0.0 };
+                var loop_i = @Vector(2, f32){ 0.0, 0.0 };
 
                 var o = @Vector(4, f32){ 0.0, 0.0, 0.0, 0.0 };
 
@@ -71,22 +72,19 @@ pub fn main() !void {
                     tanh(5.0 * @exp(l[0] - 4.0 - p[1] * -1.0) / o[0]),
                     tanh(5.0 * @exp(l[0] - 4.0 - p[1] * 1.0) / o[1]),
                     tanh(5.0 * @exp(l[0] - 4.0 - p[1] * 2.0) / o[2]),
-                    tanh(5.0 * @exp(l[0] - 4.0 - p[1] * 0.0) / o[3]),
+                    0.0,
                 };
 
-                // Clamp output values and handle NaN/Inf
-                const r_val = if (std.math.isNan(o[0]) or std.math.isInf(o[0])) 0.0 else std.math.clamp(o[0], 0.0, 1.0);
-                const g_val = if (std.math.isNan(o[1]) or std.math.isInf(o[1])) 0.0 else std.math.clamp(o[1], 0.0, 1.0);
-                const b_val = if (std.math.isNan(o[2]) or std.math.isInf(o[2])) 0.0 else std.math.clamp(o[2], 0.0, 1.0);
-
-                const red: u8 = @intFromFloat(r_val * 255.0);
-                const green: u8 = @intFromFloat(g_val * 255.0);
-                const blue: u8 = @intFromFloat(b_val * 255.0);
+                const red: u8 = @intFromFloat(o[0] * 255.0);
+                const green: u8 = @intFromFloat(o[1] * 255.0);
+                const blue: u8 = @intFromFloat(o[2] * 255.0);
 
                 try writer.writeAll(&.{ red, green, blue });
             }
         }
 
         try writer.flush();
+
+        std.debug.print("Generated {s}/{s} ({d:3}/{d:3})\n", .{ "output", output_path, i + 1, total_frames });
     }
 }

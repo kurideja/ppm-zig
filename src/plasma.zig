@@ -3,6 +3,12 @@ const std = @import("std");
 fn dot(a: @Vector(2, f32), b: @Vector(2, f32)) f32 {
     return a[0] * b[0] + a[1] * b[1];
 }
+
+fn tanh(x: f32) f32 {
+    const exp_2x = @exp(2.0 * x);
+    return (exp_2x - 1.0) / (exp_2x + 1.0);
+}
+
 pub fn main() !void {
     const cwd = std.fs.cwd();
 
@@ -47,19 +53,26 @@ pub fn main() !void {
                 const FC: @Vector(2, f32) = .{ @floatFromInt((x)), @floatFromInt((y)) };
 
                 const p = (FC * @Vector(2, f32){ 2.0, 2.0 } - r) / @Vector(2, f32){ r[1], r[1] };
-                const l = @Vector(2, f32){ 4.0, 4.0 };
-                var v = p * (l - @Vector(2, f32){ 4.0, 4.0 } * @Vector(2, f32){ @abs(0.7 - dot(p, p)), @abs(0.7 - dot(p, p)) });
+                var l = @Vector(2, f32){ 0.0, 0.0 };
+                l += @Vector(2, f32){ 4.0, 4.0 } - @Vector(2, f32){ 4.0, 4.0 } * @Vector(2, f32){ @abs(0.7 - dot(p, p)), @abs(0.7 - dot(p, p)) };
+                var v = p * l;
+                var loop_i = @Vector(2, f32){ @floatFromInt(i), 0.0 };
 
-                var o = @Vector(4, f32){ 0, 0, 0, 0 }; // Small non-zero value
+                var o = @Vector(4, f32){ 0.0, 0.0, 0.0, 0.0 };
 
-                var iy: f32 = 1.0;
-                while (iy < 8.0) : (iy += 1.0) {
+                while (loop_i[1] < 8.0) {
+                    loop_i[1] += 1.0;
                     o += (@sin(@Vector(4, f32){ v[0], v[1], v[1], v[0] }) + @Vector(4, f32){ 1.0, 1.0, 1.0, 1.0 }) *
                         @Vector(4, f32){ @abs((v[0] - v[1])), @abs((v[0] - v[1])), @abs((v[0] - v[1])), @abs((v[0] - v[1])) };
-                    v += @cos(@Vector(2, f32){ v[1], v[0] } * @Vector(2, f32){ iy, iy } + @Vector(2, f32){ @floatFromInt(i), @floatFromInt(i) } * @Vector(2, f32){ t, t }) / @Vector(2, f32){ iy, iy } + @Vector(2, f32){ 0.7, 0.7 };
+                    v += @cos(@Vector(2, f32){ v[1], v[0] } * @Vector(2, f32){ loop_i[1], loop_i[1] } + loop_i + @Vector(2, f32){ t, t }) / @Vector(2, f32){ loop_i[1], loop_i[1] } + @Vector(2, f32){ 0.7, 0.7 };
                 }
 
-                o = @tan(@Vector(4, f32){ 5, 5, 5, 5 } * @exp(@Vector(4, f32){ l[0], l[0], l[0], l[0] } - @Vector(4, f32){ 4, 4, 4, 4 } - @Vector(4, f32){ p[1], p[1], p[1], p[1] } * @Vector(4, f32){ -1, 1, 2, 0 }) / o);
+                o = @Vector(4, f32){
+                    tanh(5.0 * @exp(l[0] - 4.0 - p[1] * -1.0) / o[0]),
+                    tanh(5.0 * @exp(l[0] - 4.0 - p[1] * 1.0) / o[1]),
+                    tanh(5.0 * @exp(l[0] - 4.0 - p[1] * 2.0) / o[2]),
+                    tanh(5.0 * @exp(l[0] - 4.0 - p[1] * 0.0) / o[3]),
+                };
 
                 // Clamp output values and handle NaN/Inf
                 const r_val = if (std.math.isNan(o[0]) or std.math.isInf(o[0])) 0.0 else std.math.clamp(o[0], 0.0, 1.0);

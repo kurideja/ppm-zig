@@ -1,5 +1,8 @@
 const std = @import("std");
 
+fn dot(a: @Vector(2, f32), b: @Vector(2, f32)) f32 {
+    return a[0] * b[0] + a[1] * b[1];
+}
 pub fn main() !void {
     const cwd = std.fs.cwd();
 
@@ -37,17 +40,32 @@ pub fn main() !void {
 
         const r = @Vector(2, f32){ @floatFromInt(image_w), @floatFromInt(image_h) };
 
+        const t = (@as(f32, @floatFromInt(i)) / 240.0) * 2.0 * std.math.pi;
+
         for (0..image_h) |y| {
             for (0..image_w) |x| {
                 const FC: @Vector(2, f32) = .{ @floatFromInt((x)), @floatFromInt((y)) };
 
                 const p = (FC * @Vector(2, f32){ 2.0, 2.0 } - r) / @Vector(2, f32){ r[1], r[1] };
-                const t: f32 = @as(u32, i) / 60.0;
+                const l = @Vector(2, f32){ 4.0, 4.0 };
+                var v = p * (l - @Vector(2, f32){ 4.0, 4.0 } * @Vector(2, f32){ @abs(0.7 - dot(p, p)), @abs(0.7 - dot(p, p)) });
+                var ii = @Vector(2, f32){ @floatFromInt(i), @floatFromInt(i) };
 
-                // l,
-                // i,
-                // v=p*(l+=4.-4.*abs(.7-dot(p,p)));
-                // for(;i.y++<8.;o+=(sin(v.xyyx)+1.)*abs(v.x-v.y))v+=cos(v.yx*i.y+i+t)/i.y+.7;o=tanh(5.*exp(l.x-4.-p.y*vec4(-1,1,2,0))/o);
+                var o = @Vector(4, f32){ 0, 0, 0, 0 };
+
+                while (ii[1] <= 8) : (ii[1] += 1) {
+                    o += (@sin(@Vector(4, f32){ v[0], v[1], v[1], v[0] }) + @Vector(4, f32){ 1.0, 1.0, 1.0, 1.0 }) *
+                        @Vector(4, f32){ @abs((v[0] - v[1])), @abs((v[0] - v[1])), @abs((v[0] - v[1])), @abs((v[0] - v[1])) };
+                    v += @cos(@Vector(2, f32){ v[1], v[0] } * @Vector(2, f32){ ii[1], ii[1] } + ii * @Vector(2, f32){ t, t }) / @Vector(2, f32){ ii[1], ii[1] } + @Vector(2, f32){ 0.7, 0.7 };
+
+                    o = @tan(@Vector(4, f32){ 5, 5, 5, 5 } * @exp(@Vector(4, f32){ l[0], l[0], l[0], l[0] } - @Vector(4, f32){ 4, 4, 4, 4 } - @Vector(4, f32){ p[1], p[1], p[1], p[1] } * @Vector(4, f32){ -1, 1, 2, 0 }) / o);
+                }
+
+                const red = std.math.clamp(@as(u8, @intFromFloat(o[0] * 255)), 0, 255);
+                const green: u8 = std.math.clamp(@as(u8, @intFromFloat(o[1] * 255)), 0, 255);
+                const blue: u8 = std.math.clamp(@as(u8, @intFromFloat(o[2] * 255)), 0, 255);
+
+                try writer.writeAll(&.{ red, green, blue });
             }
         }
 

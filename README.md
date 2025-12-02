@@ -18,4 +18,6 @@ Generate mp4:
 ffmpeg -i output/output-%03d.ppm -r 60 output/output.mp4
 ```
 
-./output.mp4
+Result looks like this:
+
+![Preview](./output.gif)
